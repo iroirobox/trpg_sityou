@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>視聴記録</title>
+<style>
+:root{--ink:#1a1a1a;--sub:#8a8a8a;--line:#e8e8e8;--accent:#c8195a;--serif:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP","Source Han Serif JP",serif}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);background:#fff;font:15px/1.8 -apple-system,"Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif;-webkit-text-size-adjust:100%;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+main{max-width:640px;margin:0 auto;padding:44px 28px 96px;animation:in .5s ease both}
+@keyframes in{from{opacity:0}to{opacity:1}}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.site{margin:0 0 72px;font-size:11px;color:var(--sub);letter-spacing:.12em;line-height:1.4}
+.site a{display:block;margin-top:6px;font-family:var(--serif);font-size:17px;font-weight:600;color:var(--ink);letter-spacing:.06em}
+.site a::before{content:"";display:inline-block;width:14px;height:2px;background:var(--accent);vertical-align:middle;margin-right:10px}
+input,textarea,select{width:100%;font:inherit;font-size:16px;padding:8px 0;border:0;border-bottom:1px solid var(--line);border-radius:0;background:none;outline:0;-webkit-appearance:none;color:inherit}
+input:focus,textarea:focus,select:focus{border-bottom-color:var(--accent)}
+input[type=search]{font-family:var(--serif);font-size:22px;padding:12px 0 16px}
+input::placeholder{color:#c4c4c4;font-size:16px}
+textarea{resize:vertical;min-height:5em}
+h1{font-family:var(--serif);font-size:30px;line-height:1.45;margin:12px 0 0}
+h2{font-size:12px;font-weight:400;color:var(--sub);margin:64px 0 8px;letter-spacing:.1em}
+.kicker{font-size:12px;color:var(--sub);letter-spacing:.08em;margin:0}
+.kicker button{font:inherit;letter-spacing:inherit}
+.kicker button:hover,.kicker button.on{color:var(--accent)}
+.back{font-size:12px;letter-spacing:.08em;color:var(--sub);display:inline-block;margin-bottom:40px}
+.row{display:grid;grid-template-columns:116px 1fr;gap:16px;align-items:start;padding:20px 0;border-bottom:1px solid var(--line);transition:padding .2s}
+.row.nt{grid-template-columns:1fr}
+.row:hover{padding-left:6px}
+.th{width:116px;aspect-ratio:16/9;object-fit:cover;background:#f2f2f2;display:block}
+.b{display:block;min-width:0}
+.row .d{display:block;font-size:11px;color:var(--sub);font-variant-numeric:tabular-nums}
+.row .t{display:block;font-family:var(--serif);font-size:17px;font-weight:600;line-height:1.55}
+.row .m{display:block;font-size:12px;color:var(--sub)}
+.row:hover .t{color:var(--accent)}
+.act{display:inline-block;margin:20px 20px 0 0;font-size:13px;letter-spacing:.08em;color:var(--accent)}
+.empty,.note{color:var(--sub);padding:24px 0}
+.note{font-size:11px;padding:0;margin-top:72px}
+.watch{display:flex;flex-wrap:wrap;gap:10px;margin:36px 0 56px}
+.watch a,.btn{background:var(--accent);color:#fff;padding:12px 26px;font-size:14px;letter-spacing:.06em;border-radius:999px}
+.btn.g{background:none;color:var(--ink);border:1px solid var(--line)}
+.btn.d{background:none;color:var(--accent);border:1px solid var(--accent)}
+.f{display:grid;grid-template-columns:5em 1fr;gap:0 12px;padding:18px 0;border-top:1px solid var(--line)}
+.f dt{font-size:12px;color:var(--sub);padding-top:3px}
+.f dd{margin:0;overflow-wrap:anywhere}
+dl{margin:0}
+.memo{white-space:pre-wrap}
+.lk{border-bottom:1px solid var(--line)}
+.lk:hover{color:var(--accent);border-color:var(--accent)}
+.pp{display:block;margin-bottom:6px}
+.x{color:var(--accent);margin-right:14px;white-space:nowrap}
+details{border-top:1px solid var(--line)}
+details:last-of-type{border-bottom:1px solid var(--line)}
+summary{list-style:none;cursor:pointer;padding:18px 0;display:flex;font-size:14px}
+summary::-webkit-details-marker{display:none}
+summary span{color:var(--sub);font-size:12px;margin-left:auto}
+summary::after{content:"+";color:var(--sub);margin-left:16px}
+details[open] summary::after{content:"−";color:var(--accent)}
+label{display:block;font-size:12px;color:var(--sub);margin:24px 0 0;letter-spacing:.06em}
+.pair{display:flex;gap:12px;align-items:center}
+.pair input:first-child{flex:0 0 38%}
+.rm{color:var(--sub);padding:0 4px}
+.plus{font-size:13px;color:var(--accent);margin-top:6px}
+.btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:40px}
+.msg{color:var(--accent);font-size:13px;min-height:1.6em;margin-top:12px}
+</style>
+</head>
+<body><main id="app"><p class="empty">読み込み中</p></main>
+<script>
+const LS=localStorage, app=document.getElementById("app");
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const enc=encodeURIComponent, norm=s=>String(s||"").normalize("NFKC").toLowerCase().trim();
+const memoHtml=t=>esc(t).replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,(m,a,u)=>`<a class="lk" href="${u}" target="_blank" rel="noopener">${a}</a>`);
+async function api(action,p={}){
+  const r=await fetch(LS.rec_url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({pw:LS.rec_pw||"",action,...p})});
+  const j=await r.json(); if(j.error) throw new Error(j.error); return j;
+}
+/* ---- 書式の変換 ---- */
+function parseCast(s){const o=[],re=/([^,、，()（）]+?)\s*[(（]([^)）]*)[)）]/g;let m;while((m=re.exec(s||"")))o.push({pl:m[1].trim(),pc:m[2].trim()});
+  if(!o.length)String(s||"").split(/[,、，]/).map(x=>x.trim()).filter(Boolean).forEach(pl=>o.push({pl,pc:""}));return o;}
+function parseUrls(s){const o=[],re=/(?:([^,，、\s]*?)\s*[:：]\s*)?(https?:\/\/[^\s,，、]+)/g;let m;while((m=re.exec(s||"")))o.push({label:m[1]||"",url:m[2]});return o;}
+const ytId=u=>{const m=String(u||"").match(/(?:v=|youtu\.be\/|\/(?:live|shorts|embed)\/)([\w-]{11})/);return m?m[1]:""};
+
+let logs=[];
+function build(rows){
+  logs=rows.map(r=>{
+    const o={id:r._row,date:r["視聴日"],scenario:r["シナリオ"],system:r["システム"],gm:r["GM"],
+      gms:String(r["GM"]||"").split(/[,，、]/).map(x=>x.trim()).filter(Boolean),cast:parseCast(r["PL/PC"]),urls:parseUrls(r["配信URL"]),
+      tags:String(r["タグ"]||"").split(/[\s,、，]+/).map(t=>t.replace(/^[#＃]/,"")).filter(Boolean),memo:r["メモ"],raw:r};
+    o.hay=[[o.scenario,5],[o.system,4],[o.gm,3],[o.cast.map(c=>c.pl+" "+c.pc).join(" "),2],[o.tags.join(" "),1],[o.memo,.5],[o.date,2]].map(([t,w])=>[norm(t),w]);
+    return o;
+  }).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+}
+function search(q){
+  const ws=norm(q).split(/\s+/).filter(Boolean);
+  return logs.map(s=>{let sc=0;for(const w of ws){const b=Math.max(0,...s.hay.map(([t,wt])=>t.includes(w)?wt:0));if(!b)return null;sc+=b}return{s,sc}})
+    .filter(Boolean).sort((a,b)=>b.sc-a.sc||b.s.date.localeCompare(a.s.date)).map(x=>x.s);
+}
+const filters={scenario:s=>v=>norm(s.scenario)===norm(v),system:s=>v=>norm(s.system)===norm(v),gm:s=>v=>s.gms.some(g=>norm(g)===norm(v)),
+  pl:s=>v=>s.cast.some(c=>norm(c.pl)===norm(v)),pc:s=>v=>s.cast.some(c=>norm(c.pc)===norm(v)),
+  person:s=>v=>s.gms.some(g=>norm(g)===norm(v))||s.cast.some(c=>norm(c.pl)===norm(v))};
+const labels={scenario:"シナリオ",system:"システム",gm:"GM",pl:"PL",pc:"PC",person:""};
+const byField=(k,v)=>logs.filter(s=>filters[k](s)(v));
+
+/* ---- 部品 ---- */
+const head='<p class="site"><span>個人用</span><a href="#/">視聴記録</a></p>';
+const thumb=s=>{const id=ytId(s.urls[0]&&s.urls[0].url);return id?`<img class="th" loading="lazy" alt="" src="https://i.ytimg.com/vi/${id}/mqdefault.jpg" onerror="this.parentNode.classList.add('nt');this.remove()">`:""};
+const rowN=(s,note)=>{const t=thumb(s);return `<a class="row${t?"":" nt"}" href="#/s/${s.id}">${t}<span class="b"><span class="d">${esc(s.date)}</span><span class="t">${esc(s.scenario)}</span><span class="m">${esc([s.system,s.gms.join("、")].filter(Boolean).join("　")+(note?"　"+note:""))}</span></span></a>`};
+const row=s=>rowN(s);
+const link=(k,v)=>v?`<a class="lk" href="#/f/${k}/${enc(v)}">${esc(v)}</a>`:"";
+const go=h=>{if(location.hash==="#"+h)route();else location.hash=h};
+const NONE='<p class="empty">見つかりませんでした</p>';
+
+/* ---- 画面 ---- */
+function home(q=""){
+  const l=q?search(q):logs.slice(0,8);
+  app.innerHTML=head+`<input type="search" id="q" placeholder="シナリオ、システム、GM、PL、PC" value="${esc(q)}" autocomplete="off" enterkeyhint="search">
+  <a class="act" href="#/new">＋ 追加</a><h2>${q?l.length+"件":"最近"}</h2><div id="list">${l.map(row).join("")||(logs.length?NONE:'<p class="empty">まだ記録がありません</p>')}</div>
+  ${!q&&logs.length>8?'<a class="act" href="#/all">すべて見る</a>':""}<p class="note"><a href="#/set">設定</a></p>`;
+  const i=document.getElementById("q");
+  i.oninput=()=>{const v=i.value,l=v?search(v):logs.slice(0,8);document.querySelector("h2").textContent=v?l.length+"件":"最近";
+    document.getElementById("list").innerHTML=l.map(row).join("")||NONE;history.replaceState(history.state,"",v?"#/q/"+enc(v):"#/")};
+}
+function listPage(title,sub,items,noteFn){
+  app.innerHTML=head+`<a class="back" href="javascript:history.back()">戻る</a><p class="kicker">${sub}</p><h1>${esc(title)}</h1>
+  <h2>${items.length}件</h2>${items.map(x=>rowN(x,noteFn&&noteFn(x))).join("")||NONE}`;
+}
+function personPage(v){ // 名前の上の GM / PL で絞り込み（再度押すと全表示）
+  const r={gm:logs.some(x=>filters.gm(x)(v)),pl:logs.some(x=>filters.pl(x)(v))}, cur=history.state&&history.state.role, role=r[cur]&&r.gm&&r.pl?cur:null;
+  const btn=(k,t)=>r.gm&&r.pl?`<button class="${role===k?"on":""}" data-r="${k}">${t}</button>`:`<span>${t}</span>`;
+  const sub=[r.gm&&btn("gm","GM"),r.pl&&btn("pl","PL")].filter(Boolean).join(" / ");
+  const items=logs.filter(x=>role?filters[role](x)(v):filters.person(x)(v));
+  listPage(v,sub,items,x=>role==="gm"?"":x.cast.filter(c=>norm(c.pl)===norm(v)&&c.pc).map(c=>"PC:"+c.pc).join("、"));
+  app.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>{history.replaceState({...history.state,role:role===b.dataset.r?null:b.dataset.r},"");const y=scrollY;personPage(v);scrollTo(0,y)});
+}
+function filterPage(k,v){
+  if(k==="person") return personPage(v);
+  listPage(v,esc(labels[k]),byField(k,v),k==="pl"?x=>x.cast.filter(c=>norm(c.pl)===norm(v)&&c.pc).map(c=>"PC:"+c.pc).join("、"):null);
+}
+function allPage(){
+  const old=history.state&&history.state.order==="old";
+  listPage("すべての記録",`<button class="${old?"":"on"}" data-o="new">新しい順</button> / <button class="${old?"on":""}" data-o="old">古い順</button>`,old?[...logs].reverse():logs);
+  app.querySelectorAll("[data-o]").forEach(b=>b.onclick=()=>{history.replaceState({...history.state,order:b.dataset.o},"");const y=scrollY;allPage();scrollTo(0,y)});
+}
+function detail(id){
+  const s=logs.find(x=>x.id===id); if(!s) return home();
+  const same=logs.filter(x=>x.id!==s.id&&norm(x.scenario)===norm(s.scenario)), sid=new Set(same.map(x=>x.id));
+  const mem=x=>new Set([...x.gms,...x.cast.map(c=>c.pl)].map(norm)), me=mem(s);
+  const near=logs.filter(x=>x.id!==s.id&&!sid.has(x.id)).map(x=>({x,n:[...mem(x)].filter(m=>me.has(m)).length})).filter(o=>o.n>=2).sort((a,b)=>b.n-a.n||b.x.date.localeCompare(a.x.date)).slice(0,10);
+  const rels=[];
+  if(same.length) rels.push(`<details><summary>同じシナリオ<span>${same.length}件</span></summary>${same.map(row).join("")}</details>`);
+  if(near.length) rels.push(`<details><summary>同卓者が近い記録<span>${near.length}件</span></summary>${near.map(o=>rowN(o.x,"共通"+o.n+"人")).join("")}</details>`);
+  const pn=n=>`<span class="pp"><a class="lk" href="#/f/person/${enc(n)}">${esc(n)}</a></span>`;
+  const big=ytId(s.urls[0]&&s.urls[0].url);
+  app.innerHTML=head+`<a class="back" href="javascript:history.back()">戻る</a><p class="kicker">視聴日　${esc(s.date)}</p><h1>${esc(s.scenario)}</h1>
+  ${big?`<img class="th" style="width:100%;margin-top:28px" alt="" src="https://i.ytimg.com/vi/${big}/hqdefault.jpg" onerror="this.remove()">`:""}
+  <div class="watch">${s.urls.map((u,i)=>`<a href="${esc(u.url)}" target="_blank" rel="noopener">${esc(u.label||(s.urls.length>1?"配信"+(i+1):"見る"))}</a>`).join("")||'<span class="empty">URLなし</span>'}</div>
+  <dl>${s.system?`<div class="f"><dt>システム</dt><dd>${link("system",s.system)}</dd></div>`:""}
+  ${s.gms.length?`<div class="f"><dt>GM</dt><dd>${s.gms.map(pn).join("")}</dd></div>`:""}
+  ${s.cast.length?`<div class="f"><dt>参加</dt><dd>${s.cast.map(c=>`<span class="pp">${pn(c.pl)}${c.pc?` <small style="color:var(--sub)">／ ${link("pc",c.pc)}</small>`:""}</span>`).join("")}</dd></div>`:""}
+  ${s.tags.length?`<div class="f"><dt>タグ</dt><dd>${s.tags.map(t=>`<a class="x" href="https://x.com/search?q=${enc("#"+t)}" target="_blank" rel="noopener">#${esc(t)}</a>`).join("")}</dd></div>`:""}
+  ${s.memo?`<div class="f"><dt>メモ</dt><dd class="memo">${memoHtml(s.memo)}</dd></div>`:""}</dl>
+  <a class="act" href="#/edit/${s.id}">編集</a>${rels.length?`<h2>関連</h2>${rels.join("")}`:""}`;
+}
+/* ---- 追加・編集 ---- */
+const pairRow=(a,b,pa,pb)=>`<div class="pair"><input value="${esc(a)}" placeholder="${pa}"><input value="${esc(b)}" placeholder="${pb}"><button class="rm" type="button">×</button></div>`;
+const pairs=(id,rows,pa,pb)=>`<div id="${id}">${(rows.length?rows:[["",""]]).map(r=>pairRow(r[0],r[1],pa,pb)).join("")}</div><button class="plus" type="button" data-add="${id}" data-pa="${pa}" data-pb="${pb}">＋ 追加</button>`;
+const vals=id=>[...document.querySelectorAll(`#${id} .pair`)].map(p=>[...p.querySelectorAll("input")].map(i=>i.value.trim()));
+function form(id,pre){
+  const s=id?logs.find(x=>x.id===id):null, r=pre||(s?s.raw:{}), cur=r["システム"]||"";
+  const sys=[...new Set(logs.map(x=>x.system).filter(Boolean).concat(cur?[cur]:[]))].sort((a,b)=>a.localeCompare(b,"ja"));
+  const today=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+  app.innerHTML=head+`<a class="back" href="javascript:history.back()">戻る</a><p class="kicker">${s?"編集":"追加"}</p>
+  <label>視聴日</label><input type="date" id="f1" value="${esc(r["視聴日"]||today)}">
+  <label>シナリオ</label><input id="f2" value="${esc(r["シナリオ"])}">
+  <label>システム</label><select id="f3" onchange="f3n.style.display=this.value==='__new'?'block':'none'"><option value="">（未選択）</option>${sys.map(x=>`<option${x===cur?" selected":""}>${esc(x)}</option>`).join("")}<option value="__new">＋ 新しく追加…</option></select><input id="f3n" placeholder="新しいシステム名" style="display:none">
+  <label>GM（複数人は , で区切る）</label><input id="f4" value="${esc(r["GM"])}">
+  <label>参加者（PL / PC）</label>${pairs("cast",parseCast(r["PL/PC"]).map(c=>[c.pl,c.pc]),"PL名","PC名")}
+  <label>配信URL（前編・後編など）</label>${pairs("urls",parseUrls(r["配信URL"]).map(u=>[u.label,u.url]),"前編など","https://…")}
+  <label>タグ（# なし）</label><input id="f7" value="${esc(r["タグ"])}">
+  <label>メモ・感想（[文字](URL) で文字リンク）</label><textarea id="f8">${esc(r["メモ"])}</textarea>
+  <div class="btns"><button class="btn" data-a="save">保存</button>${s?'<button class="btn g" data-a="dup">複製</button><button class="btn d" data-a="del">削除</button>':""}</div><p class="msg" id="msg"></p>`;
+  app.onclick=e=>{const x=e.target; if(x.classList.contains("rm")) x.parentNode.remove(); if(x.dataset.add) document.getElementById(x.dataset.add).insertAdjacentHTML("beforeend",pairRow("","",x.dataset.pa,x.dataset.pb));};
+  const msg=t=>document.getElementById("msg").textContent=t;
+  const collect=()=>({"視聴日":f1.value,"シナリオ":f2.value.trim(),"システム":(f3.value==="__new"?f3n.value:f3.value).trim(),"GM":f4.value.trim(),
+    "PL/PC":vals("cast").filter(c=>c[0]).map(c=>c[1]?`${c[0]}(${c[1]})`:c[0]).join(", "),
+    "配信URL":vals("urls").filter(c=>c[1]).map(c=>c[0]?`${c[0]}:${c[1]}`:c[1]).join(","),"タグ":f7.value.trim().replace(/#/g,""),"メモ":f8.value});
+  app.querySelectorAll("[data-a]").forEach(b=>b.onclick=async()=>{
+    const a=b.dataset.a, d=collect();
+    if(a==="dup"){form(null,{...d,"シナリオ":d["シナリオ"]+"（複製）"});return}
+    try{
+      if(a==="del"){ if(!confirm("削除しますか？元に戻せません"))return; msg("処理中…"); await api("delete",{row:id}); await refresh(); go("#/"); return; }
+      if(!d["シナリオ"]) return msg("シナリオ名を入力してください");
+      msg("保存中…"); const res=await api("save",{row:id||undefined,data:d}); await refresh(); go("#/s/"+res.row);
+    }catch(e){msg(e.message)}
+  });
+}
+/* ---- 設定（URLとパスワードはこの端末のブラウザにだけ保存） ---- */
+function settings(msg=""){
+  app.innerHTML=head+`<p class="kicker">設定</p><label>Apps Script のURL</label><input id="u" value="${esc(LS.rec_url||"")}" placeholder="https://script.google.com/macros/s/…/exec">
+  <label>パスワード</label><input type="password" id="p" value="${esc(LS.rec_pw||"")}">
+  <div class="btns"><button class="btn" id="ok">保存して開く</button></div><p class="msg" id="msg">${esc(msg)}</p>
+  <p class="note">URLとパスワードは、この端末のブラウザの中にだけ保存されます。</p>`;
+  document.getElementById("ok").onclick=async()=>{LS.rec_url=u.value.trim();LS.rec_pw=p.value;document.getElementById("msg").textContent="確認中…";
+    try{await refresh();go("#/")}catch(e){document.getElementById("msg").textContent=e.message}};
+}
+/* ---- ルーティング ---- */
+function route(){
+  let h=location.hash.slice(1);try{h=decodeURIComponent(h)}catch(e){}
+  const p=h.split("/");
+  if(!LS.rec_url||p[1]==="set") settings();
+  else if(p[1]==="s") detail(+p[2]);
+  else if(p[1]==="f"&&filters[p[2]]) filterPage(p[2],p.slice(3).join("/"));
+  else if(p[1]==="all") allPage();
+  else if(p[1]==="new") form(null);
+  else if(p[1]==="edit") form(+p[2]);
+  else if(p[1]==="q") home(p.slice(2).join("/"));
+  else home();
+  window.scrollTo(0,(history.state&&history.state.y)||0);
+}
+async function refresh(){ build((await api("list")).rows); }
+history.scrollRestoration="manual";
+let st;addEventListener("scroll",()=>{clearTimeout(st);st=setTimeout(()=>history.replaceState({...history.state,y:scrollY},""),150)},{passive:true});
+addEventListener("hashchange",route);
+(async()=>{
+  if(!LS.rec_url) return route();
+  try{await refresh();route()}catch(e){settings(e.message)}
+})();
+</script>
+</body>
+</html>
