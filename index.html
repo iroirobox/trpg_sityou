@@ -51,7 +51,9 @@ dl{margin:0}
 .memo{white-space:pre-wrap}
 .lk{border-bottom:1px solid var(--line)}
 .lk:hover{color:var(--accent);border-color:var(--accent)}
-.pp{display:block;margin-bottom:6px}
+.pp{display:block;margin-bottom:12px;line-height:1.6}
+.pp:last-child{margin-bottom:0}
+.pcn{color:var(--sub)}
 .x{color:var(--accent);margin-right:14px;white-space:nowrap}
 details{border-top:1px solid var(--line)}
 details:last-of-type{border-bottom:1px solid var(--line)}
@@ -75,9 +77,14 @@ const LS=localStorage, app=document.getElementById("app");
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const enc=encodeURIComponent, norm=s=>String(s||"").normalize("NFKC").toLowerCase().trim();
 const memoHtml=t=>esc(t).replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,(m,a,u)=>`<a class="lk" href="${u}" target="_blank" rel="noopener">${a}</a>`);
-async function api(action,p={}){
-  const r=await fetch(LS.rec_url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({pw:LS.rec_pw||"",action,...p})});
-  const j=await r.json(); if(j.error) throw new Error(j.error); return j;
+async function api(action,p={},retry=false){
+  const c=new AbortController(), t=setTimeout(()=>c.abort(),40000); let txt;
+  try{ const r=await fetch(LS.rec_url,{method:"POST",signal:c.signal,headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({pw:LS.rec_pw||"",action,...p})}); txt=await r.text(); }
+  catch(e){ if(retry) return api(action,p,false);
+    throw new Error(e.name==="AbortError"?"時間切れでした。もう一度試してください":"通信できませんでした。URLが「…/exec」で終わるか、デプロイのアクセス権が「全員」かを確認してください"); }
+  finally{ clearTimeout(t); }
+  let j; try{ j=JSON.parse(txt); }catch(e){ throw new Error("Apps Scriptから想定外の応答です。デプロイを「新バージョン」で更新したか、アクセス権が「全員」かを確認してください"); }
+  if(j.error) throw new Error(j.error); return j;
 }
 /* ---- 書式の変換 ---- */
 function parseCast(s){const o=[],re=/([^,、，()（）]+?)\s*[(（]([^)）]*)[)）]/g;let m;while((m=re.exec(s||"")))o.push({pl:m[1].trim(),pc:m[2].trim()});
@@ -154,14 +161,14 @@ function detail(id){
   const rels=[];
   if(same.length) rels.push(`<details><summary>同じシナリオ<span>${same.length}件</span></summary>${same.map(row).join("")}</details>`);
   if(near.length) rels.push(`<details><summary>同卓者が近い記録<span>${near.length}件</span></summary>${near.map(o=>rowN(o.x,"共通"+o.n+"人")).join("")}</details>`);
-  const pn=n=>`<span class="pp"><a class="lk" href="#/f/person/${enc(n)}">${esc(n)}</a></span>`;
+  const pn=n=>`<a class="lk" href="#/f/person/${enc(n)}">${esc(n)}</a>`;
   const big=ytId(s.urls[0]&&s.urls[0].url);
   app.innerHTML=head+`<a class="back" href="javascript:history.back()">戻る</a><p class="kicker">視聴日　${esc(s.date)}</p><h1>${esc(s.scenario)}</h1>
   ${big?`<img class="th" style="width:100%;margin-top:28px" alt="" src="https://i.ytimg.com/vi/${big}/hqdefault.jpg" onerror="this.remove()">`:""}
   <div class="watch">${s.urls.map((u,i)=>`<a href="${esc(u.url)}" target="_blank" rel="noopener">${esc(u.label||(s.urls.length>1?"配信"+(i+1):"見る"))}</a>`).join("")||'<span class="empty">URLなし</span>'}</div>
   <dl>${s.system?`<div class="f"><dt>システム</dt><dd>${link("system",s.system)}</dd></div>`:""}
-  ${s.gms.length?`<div class="f"><dt>GM</dt><dd>${s.gms.map(pn).join("")}</dd></div>`:""}
-  ${s.cast.length?`<div class="f"><dt>参加</dt><dd>${s.cast.map(c=>`<span class="pp">${pn(c.pl)}${c.pc?` <small style="color:var(--sub)">／ ${link("pc",c.pc)}</small>`:""}</span>`).join("")}</dd></div>`:""}
+  ${s.gms.length?`<div class="f"><dt>GM</dt><dd>${s.gms.map(g=>`<span class="pp">${pn(g)}</span>`).join("")}</dd></div>`:""}
+  ${s.cast.length?`<div class="f"><dt>参加</dt><dd>${s.cast.map(c=>`<span class="pp">${pn(c.pl)}${c.pc?` <small class="pcn">／ ${link("pc",c.pc)}</small>`:""}</span>`).join("")}</dd></div>`:""}
   ${s.tags.length?`<div class="f"><dt>タグ</dt><dd>${s.tags.map(t=>`<a class="x" href="https://x.com/search?q=${enc("#"+t)}" target="_blank" rel="noopener">#${esc(t)}</a>`).join("")}</dd></div>`:""}
   ${s.memo?`<div class="f"><dt>メモ</dt><dd class="memo">${memoHtml(s.memo)}</dd></div>`:""}</dl>
   <a class="act" href="#/edit/${s.id}">編集</a>${rels.length?`<h2>関連</h2>${rels.join("")}`:""}`;
@@ -174,8 +181,7 @@ function form(id,pre){
   const s=id?logs.find(x=>x.id===id):null, r=pre||(s?s.raw:{}), cur=r["システム"]||"";
   const sys=[...new Set(logs.map(x=>x.system).filter(Boolean).concat(cur?[cur]:[]))].sort((a,b)=>a.localeCompare(b,"ja"));
   const today=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
-  app.innerHTML=head+`<a class="back" href="javascript:history.back()">戻る</a><p class="kicker">${s?"編集":"追加"}</p>
-  <label>視聴日</label><input type="date" id="f1" value="${esc(r["視聴日"]||today)}">
+  app.innerHTML=head+`<a class="back" href="javascript:history.back()">戻る</a>  <label>視聴日</label><input type="date" id="f1" value="${esc(r["視聴日"]||today)}">
   <label>シナリオ</label><input id="f2" value="${esc(r["シナリオ"])}">
   <label>システム</label><select id="f3" onchange="f3n.style.display=this.value==='__new'?'block':'none'"><option value="">（未選択）</option>${sys.map(x=>`<option${x===cur?" selected":""}>${esc(x)}</option>`).join("")}<option value="__new">＋ 新しく追加…</option></select><input id="f3n" placeholder="新しいシステム名" style="display:none">
   <label>GM（複数人は , で区切る）</label><input id="f4" value="${esc(r["GM"])}">
@@ -193,9 +199,9 @@ function form(id,pre){
     const a=b.dataset.a, d=collect();
     if(a==="dup"){form(null,{...d,"シナリオ":d["シナリオ"]+"（複製）"});return}
     try{
-      if(a==="del"){ if(!confirm("削除しますか？元に戻せません"))return; msg("処理中…"); await api("delete",{row:id}); await refresh(); go("#/"); return; }
+      if(a==="del"){ if(!confirm("削除しますか？元に戻せません"))return; msg("処理中…"); await api("delete",{row:id}); rowsData=rowsData.filter(r=>r._row!==id).map(r=>r._row>id?{...r,_row:r._row-1}:r); build(rowsData); go("#/"); return; }
       if(!d["シナリオ"]) return msg("シナリオ名を入力してください");
-      msg("保存中…"); const res=await api("save",{row:id||undefined,data:d}); await refresh(); go("#/s/"+res.row);
+      msg("保存中…"); const res=await api("save",{row:id||undefined,data:d}); rowsData=rowsData.filter(r=>r._row!==res.row).concat({...d,_row:res.row}); build(rowsData); go("#/s/"+res.row);
     }catch(e){msg(e.message)}
   });
 }
@@ -222,7 +228,8 @@ function route(){
   else home();
   window.scrollTo(0,(history.state&&history.state.y)||0);
 }
-async function refresh(){ build((await api("list")).rows); }
+let rowsData=[];
+async function refresh(){ rowsData=(await api("list",{},true)).rows; build(rowsData); }
 history.scrollRestoration="manual";
 let st;addEventListener("scroll",()=>{clearTimeout(st);st=setTimeout(()=>history.replaceState({...history.state,y:scrollY},""),150)},{passive:true});
 addEventListener("hashchange",route);
