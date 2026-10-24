@@ -221,7 +221,7 @@ async function loadArch(){
 }
 async function importPage(q=""){
   if(!arch){ app.innerHTML=head+'<p class="empty">読み込み中</p>'; try{await loadArch()}catch(e){app.innerHTML=head+`<a class="back" href="#/">戻る</a><p class="empty">アーカイブを読み込めませんでした。設定のURLを確認してください。</p>`;return} }
-  const draw=v=>{const l=(v?search(v,arch):arch).slice(0,v?60:10);
+  const draw=v=>{const l=v?search(v,arch):arch; // 検索なしでも全件表示（画像は遅延読み込み）
     return l.map(o=>{const rec=logs.find(x=>x.urls.some(u=>o.urls.some(w=>vid(u.url)===vid(w.url))));
       return rec?rowN(o,"記録済み","#/s/"+rec.id):rowN(o,"","#/imp/"+o.id)}).join("")||NONE};
   app.innerHTML=head+`<a class="back" href="#/">戻る</a><input type="search" id="q" placeholder="アーカイブから探す" value="${esc(q)}" autocomplete="off"><div id="list">${draw(q)}</div>`;
