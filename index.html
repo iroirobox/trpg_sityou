@@ -103,6 +103,7 @@ function mkLog(r,id,date){
 function build(rows){ logs=rows.map(r=>mkLog(r,r._row,r["視聴日"])).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id); }
 const durSec=s=>{const m=String(s||"").match(/(\d+):(\d\d):(\d\d)/);return m?+m[1]*3600+ +m[2]*60+ +m[3]:0};
 const fmtDur=t=>{const h=Math.floor(t/3600),m=Math.floor(t%3600/60);return h?`${h}時間${m}分`:`${m}分`};
+const cnt=l=>{const t=l.reduce((a,x)=>a+durSec(x.dur),0);return l.length+"件"+(t?"　合計 "+fmtDur(t):"")}; // 表示中の件数と合計時間
 const vid=u=>ytId(u)||norm(u);
 function search(q,list=logs){
   const ws=norm(q).split(/\s+/).filter(Boolean);
@@ -129,15 +130,15 @@ function home(q=""){
   const tot=logs.reduce((a,x)=>a+durSec(x.dur),0);
   const l=q?search(q):logs.slice(0,8);
   app.innerHTML=head+`<input type="search" id="q" placeholder="シナリオ、システム、GM、PL、PC" value="${esc(q)}" autocomplete="off" enterkeyhint="search">
-  <a class="act" href="#/new">＋ 追加</a>${LS.rec_arch?'<a class="act" href="#/import">アーカイブから追加</a>':""}<h2>${q?l.length+"件":"最近"}</h2><div id="list">${l.map(row).join("")||(logs.length?NONE:'<p class="empty">まだ記録がありません</p>')}</div>
+  <a class="act" href="#/new">＋ 追加</a>${LS.rec_arch?'<a class="act" href="#/import">アーカイブから追加</a>':""}<h2>${q?cnt(l):"最近"}</h2><div id="list">${l.map(row).join("")||(logs.length?NONE:'<p class="empty">まだ記録がありません</p>')}</div>
   ${!q&&logs.length>8?'<a class="act" href="#/all">すべて見る</a>':""}<p class="note">${tot?"合計 "+fmtDur(tot)+"　":""}<a href="#/set">設定</a></p>`;
   const i=document.getElementById("q");
-  i.oninput=()=>{const v=i.value,l=v?search(v):logs.slice(0,8);document.querySelector("h2").textContent=v?l.length+"件":"最近";
+  i.oninput=()=>{const v=i.value,l=v?search(v):logs.slice(0,8);document.querySelector("h2").textContent=v?cnt(l):"最近";
     document.getElementById("list").innerHTML=l.map(row).join("")||NONE;history.replaceState(history.state,"",v?"#/q/"+enc(v):"#/")};
 }
 function listPage(title,sub,items,noteFn){
   app.innerHTML=head+`<a class="back" href="javascript:history.back()">戻る</a><p class="kicker">${sub}</p><h1>${esc(title)}</h1>
-  <h2>${items.length}件</h2>${items.map(x=>rowN(x,noteFn&&noteFn(x))).join("")||NONE}`;
+  <h2>${cnt(items)}</h2>${items.map(x=>rowN(x,noteFn&&noteFn(x))).join("")||NONE}`;
 }
 function personPage(v){ // 名前の上の GM / PL で絞り込み（再度押すと全表示）
   const r={gm:logs.some(x=>filters.gm(x)(v)),pl:logs.some(x=>filters.pl(x)(v))}, cur=history.state&&history.state.role, role=r[cur]&&r.gm&&r.pl?cur:null;
@@ -221,9 +222,8 @@ async function loadArch(){
 }
 async function importPage(q=""){
   if(!arch){ app.innerHTML=head+'<p class="empty">読み込み中</p>'; try{await loadArch()}catch(e){app.innerHTML=head+`<a class="back" href="#/">戻る</a><p class="empty">アーカイブを読み込めませんでした。設定のURLを確認してください。</p>`;return} }
-  const draw=v=>{const l=v?search(v,arch):arch; // 検索なしでも全件表示（画像は遅延読み込み）
-    return l.map(o=>{const rec=logs.find(x=>x.urls.some(u=>o.urls.some(w=>vid(u.url)===vid(w.url))));
-      return rec?rowN(o,"記録済み","#/s/"+rec.id):rowN(o,"","#/imp/"+o.id)}).join("")||NONE};
+  const recOf=o=>logs.some(x=>x.urls.some(u=>o.urls.some(w=>vid(u.url)===vid(w.url)))); // 記録済みは出さない
+  const draw=v=>(v?search(v,arch):arch).filter(o=>!recOf(o)).map(o=>rowN(o,"","#/imp/"+o.id)).join("")||NONE;
   app.innerHTML=head+`<a class="back" href="#/">戻る</a><input type="search" id="q" placeholder="アーカイブから探す" value="${esc(q)}" autocomplete="off"><div id="list">${draw(q)}</div>`;
   const i=document.getElementById("q"); i.oninput=()=>{document.getElementById("list").innerHTML=draw(i.value)};
 }
