@@ -53,7 +53,7 @@ dl{margin:0}
 .lk:hover{color:var(--accent);border-color:var(--accent)}
 .pp{display:block;margin-bottom:12px;line-height:1.6}
 .pp:last-child{margin-bottom:0}
-.pcn{color:var(--sub)}
+.pcn{color:var(--sub);font-size:inherit}
 .x{color:var(--accent);margin-right:14px;white-space:nowrap}
 details{border-top:1px solid var(--line)}
 details:last-of-type{border-bottom:1px solid var(--line)}
@@ -93,18 +93,20 @@ function parseUrls(s){const o=[],re=/(?:([^,，、\s]*?)\s*[:：]\s*)?(https?:\/
 const ytId=u=>{const m=String(u||"").match(/(?:v=|youtu\.be\/|\/(?:live|shorts|embed)\/)([\w-]{11})/);return m?m[1]:""};
 
 let logs=[];
-function build(rows){
-  logs=rows.map(r=>{
-    const o={id:r._row,date:r["視聴日"],scenario:r["シナリオ"],system:r["システム"],gm:r["GM"],
-      gms:String(r["GM"]||"").split(/[,，、]/).map(x=>x.trim()).filter(Boolean),cast:parseCast(r["PL/PC"]),urls:parseUrls(r["配信URL"]),
-      tags:String(r["タグ"]||"").split(/[\s,、，]+/).map(t=>t.replace(/^[#＃]/,"")).filter(Boolean),memo:r["メモ"],raw:r};
-    o.hay=[[o.scenario,5],[o.system,4],[o.gm,3],[o.cast.map(c=>c.pl+" "+c.pc).join(" "),2],[o.tags.join(" "),1],[o.memo,.5],[o.date,2]].map(([t,w])=>[norm(t),w]);
-    return o;
-  }).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+function mkLog(r,id,date){
+  const o={id,date,scenario:r["シナリオ"],system:r["システム"],gm:r["GM"],dur:r["配信時間"]||"",
+    gms:String(r["GM"]||"").split(/[,，、]/).map(x=>x.trim()).filter(Boolean),cast:parseCast(r["PL/PC"]),urls:parseUrls(r["配信URL"]),
+    tags:String(r["タグ"]||"").split(/[\s,、，]+/).map(t=>t.replace(/^[#＃]/,"")).filter(Boolean),memo:r["メモ"],raw:r};
+  o.hay=[[o.scenario,5],[o.system,4],[o.gm,3],[o.cast.map(c=>c.pl+" "+c.pc).join(" "),2],[o.tags.join(" "),1],[o.memo,.5],[o.date,2]].map(([t,w])=>[norm(t),w]);
+  return o;
 }
-function search(q){
+function build(rows){ logs=rows.map(r=>mkLog(r,r._row,r["視聴日"])).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id); }
+const durSec=s=>{const m=String(s||"").match(/(\d+):(\d\d):(\d\d)/);return m?+m[1]*3600+ +m[2]*60+ +m[3]:0};
+const fmtDur=t=>{const h=Math.floor(t/3600),m=Math.floor(t%3600/60);return h?`${h}時間${m}分`:`${m}分`};
+const vid=u=>ytId(u)||norm(u);
+function search(q,list=logs){
   const ws=norm(q).split(/\s+/).filter(Boolean);
-  return logs.map(s=>{let sc=0;for(const w of ws){const b=Math.max(0,...s.hay.map(([t,wt])=>t.includes(w)?wt:0));if(!b)return null;sc+=b}return{s,sc}})
+  return list.map(s=>{let sc=0;for(const w of ws){const b=Math.max(0,...s.hay.map(([t,wt])=>t.includes(w)?wt:0));if(!b)return null;sc+=b}return{s,sc}})
     .filter(Boolean).sort((a,b)=>b.sc-a.sc||b.s.date.localeCompare(a.s.date)).map(x=>x.s);
 }
 const filters={scenario:s=>v=>norm(s.scenario)===norm(v),system:s=>v=>norm(s.system)===norm(v),gm:s=>v=>s.gms.some(g=>norm(g)===norm(v)),
@@ -116,7 +118,7 @@ const byField=(k,v)=>logs.filter(s=>filters[k](s)(v));
 /* ---- 部品 ---- */
 const head='<p class="site"><span>個人用</span><a href="#/">視聴記録</a></p>';
 const thumb=s=>{const id=ytId(s.urls[0]&&s.urls[0].url);return id?`<img class="th" loading="lazy" alt="" src="https://i.ytimg.com/vi/${id}/mqdefault.jpg" onerror="this.parentNode.classList.add('nt');this.remove()">`:""};
-const rowN=(s,note)=>{const t=thumb(s);return `<a class="row${t?"":" nt"}" href="#/s/${s.id}">${t}<span class="b"><span class="d">${esc(s.date)}</span><span class="t">${esc(s.scenario)}</span><span class="m">${esc([s.system,s.gms.join("、")].filter(Boolean).join("　")+(note?"　"+note:""))}</span></span></a>`};
+const rowN=(s,note,href)=>{const t=thumb(s);return `<a class="row${t?"":" nt"}" href="${href||"#/s/"+s.id}">${t}<span class="b"><span class="d">${esc(s.date)}</span><span class="t">${esc(s.scenario)}</span><span class="m">${esc([s.system,s.gms.join("、")].filter(Boolean).join("　")+(note?"　"+note:""))}</span></span></a>`};
 const row=s=>rowN(s);
 const link=(k,v)=>v?`<a class="lk" href="#/f/${k}/${enc(v)}">${esc(v)}</a>`:"";
 const go=h=>{if(location.hash==="#"+h)route();else location.hash=h};
@@ -124,10 +126,11 @@ const NONE='<p class="empty">見つかりませんでした</p>';
 
 /* ---- 画面 ---- */
 function home(q=""){
+  const tot=logs.reduce((a,x)=>a+durSec(x.dur),0);
   const l=q?search(q):logs.slice(0,8);
   app.innerHTML=head+`<input type="search" id="q" placeholder="シナリオ、システム、GM、PL、PC" value="${esc(q)}" autocomplete="off" enterkeyhint="search">
-  <a class="act" href="#/new">＋ 追加</a><h2>${q?l.length+"件":"最近"}</h2><div id="list">${l.map(row).join("")||(logs.length?NONE:'<p class="empty">まだ記録がありません</p>')}</div>
-  ${!q&&logs.length>8?'<a class="act" href="#/all">すべて見る</a>':""}<p class="note"><a href="#/set">設定</a></p>`;
+  <a class="act" href="#/new">＋ 追加</a>${LS.rec_arch?'<a class="act" href="#/import">アーカイブから追加</a>':""}<h2>${q?l.length+"件":"最近"}</h2><div id="list">${l.map(row).join("")||(logs.length?NONE:'<p class="empty">まだ記録がありません</p>')}</div>
+  ${!q&&logs.length>8?'<a class="act" href="#/all">すべて見る</a>':""}<p class="note">${tot?"合計 "+fmtDur(tot)+"　":""}<a href="#/set">設定</a></p>`;
   const i=document.getElementById("q");
   i.oninput=()=>{const v=i.value,l=v?search(v):logs.slice(0,8);document.querySelector("h2").textContent=v?l.length+"件":"最近";
     document.getElementById("list").innerHTML=l.map(row).join("")||NONE;history.replaceState(history.state,"",v?"#/q/"+enc(v):"#/")};
@@ -167,6 +170,7 @@ function detail(id){
   ${big?`<img class="th" style="width:100%;margin-top:28px" alt="" src="https://i.ytimg.com/vi/${big}/hqdefault.jpg" onerror="this.remove()">`:""}
   <div class="watch">${s.urls.map((u,i)=>`<a href="${esc(u.url)}" target="_blank" rel="noopener">${esc(u.label||(s.urls.length>1?"配信"+(i+1):"見る"))}</a>`).join("")||'<span class="empty">URLなし</span>'}</div>
   <dl>${s.system?`<div class="f"><dt>システム</dt><dd>${link("system",s.system)}</dd></div>`:""}
+  ${s.dur?`<div class="f"><dt>時間</dt><dd>${fmtDur(durSec(s.dur))}</dd></div>`:""}
   ${s.gms.length?`<div class="f"><dt>GM</dt><dd>${s.gms.map(g=>`<span class="pp">${pn(g)}</span>`).join("")}</dd></div>`:""}
   ${s.cast.length?`<div class="f"><dt>参加</dt><dd>${s.cast.map(c=>`<span class="pp">${pn(c.pl)}${c.pc?` <small class="pcn">／ ${link("pc",c.pc)}</small>`:""}</span>`).join("")}</dd></div>`:""}
   ${s.tags.length?`<div class="f"><dt>タグ</dt><dd>${s.tags.map(t=>`<a class="x" href="https://x.com/search?q=${enc("#"+t)}" target="_blank" rel="noopener">#${esc(t)}</a>`).join("")}</dd></div>`:""}
@@ -201,19 +205,42 @@ function form(id,pre){
     try{
       if(a==="del"){ if(!confirm("削除しますか？元に戻せません"))return; msg("処理中…"); await api("delete",{row:id}); rowsData=rowsData.filter(r=>r._row!==id).map(r=>r._row>id?{...r,_row:r._row-1}:r); build(rowsData); go("#/"); return; }
       if(!d["シナリオ"]) return msg("シナリオ名を入力してください");
-      msg("保存中…"); const res=await api("save",{row:id||undefined,data:d}); rowsData=rowsData.filter(r=>r._row!==res.row).concat({...d,_row:res.row}); build(rowsData); go("#/s/"+res.row);
+      msg("保存中…"); const res=await api("save",{row:id||undefined,data:d}); rowsData=rowsData.filter(r=>r._row!==res.row).concat({...d,_row:res.row,"配信時間":res.duration||""}); build(rowsData); go("#/s/"+res.row);
     }catch(e){msg(e.message)}
   });
 }
+/* ---- アーカイブから追加 ---- */
+let arch=null;
+async function loadArch(){
+  const out=[];
+  for(const u of String(LS.rec_arch||"").split(/\s+/).filter(Boolean)){
+    const j=await (await fetch(u)).json();
+    j.streams.forEach(r=>out.push({"視聴日":"","シナリオ":r["シナリオ"],"システム":r["システム"],"GM":r["GM"],"PL/PC":r["PL/PC"],"配信URL":r["URL"],"タグ":r["タグ"],"メモ":"",_d:String(r["配信日時"]||"").slice(0,10)}));
+  }
+  arch=out.map((r,i)=>mkLog(r,i,r._d)).sort((a,b)=>b.date.localeCompare(a.date));
+}
+async function importPage(q=""){
+  if(!arch){ app.innerHTML=head+'<p class="empty">読み込み中</p>'; try{await loadArch()}catch(e){app.innerHTML=head+`<a class="back" href="#/">戻る</a><p class="empty">アーカイブを読み込めませんでした。設定のURLを確認してください。</p>`;return} }
+  const draw=v=>{const l=(v?search(v,arch):arch).slice(0,v?60:10);
+    return l.map(o=>{const rec=logs.find(x=>x.urls.some(u=>o.urls.some(w=>vid(u.url)===vid(w.url))));
+      return rec?rowN(o,"記録済み","#/s/"+rec.id):rowN(o,"","#/imp/"+o.id)}).join("")||NONE};
+  app.innerHTML=head+`<a class="back" href="#/">戻る</a><input type="search" id="q" placeholder="アーカイブから探す" value="${esc(q)}" autocomplete="off"><div id="list">${draw(q)}</div>`;
+  const i=document.getElementById("q"); i.oninput=()=>{document.getElementById("list").innerHTML=draw(i.value)};
+}
+const importForm=i=>{ const o=arch&&arch.find(x=>x.id===i); if(!o) return go("#/import"); const r={...o.raw}; delete r._d; form(null,r); };
+
 /* ---- 設定（URLとパスワードはこの端末のブラウザにだけ保存） ---- */
 function settings(msg=""){
   app.innerHTML=head+`<p class="kicker">設定</p><label>Apps Script のURL</label><input id="u" value="${esc(LS.rec_url||"")}" placeholder="https://script.google.com/macros/s/…/exec">
   <label>パスワード</label><input type="password" id="p" value="${esc(LS.rec_pw||"")}">
-  <div class="btns"><button class="btn" id="ok">保存して開く</button></div><p class="msg" id="msg">${esc(msg)}</p>
+  <label>アーカイブのURL（任意。複数は改行で区切る）</label><textarea id="a" placeholder="https://script.google.com/macros/s/…/exec">${esc(LS.rec_arch||"")}</textarea>
+  <div class="btns"><button class="btn" id="ok">保存して開く</button>${LS.rec_url?'<button class="btn g" id="rc">配信時間を計算し直す</button>':""}</div><p class="msg" id="msg">${esc(msg)}</p>
   <p class="note">URLとパスワードは、この端末のブラウザの中にだけ保存されます。</p>`;
-  document.getElementById("ok").onclick=async()=>{LS.rec_url=u.value.trim();LS.rec_pw=p.value;document.getElementById("msg").textContent="確認中…";
+  document.getElementById("ok").onclick=async()=>{LS.rec_url=u.value.trim();LS.rec_pw=p.value;LS.rec_arch=a.value.trim();arch=null;document.getElementById("msg").textContent="確認中…";
     try{await refresh();go("#/")}catch(e){document.getElementById("msg").textContent=e.message}};
 }
+document.addEventListener("click",async e=>{ if(e.target.id!=="rc") return; const m=document.getElementById("msg"); m.textContent="計算中…";
+  try{const r=await api("recalc"); await refresh(); m.textContent=`${r.updated}件を更新。${r.pending}件は未確定です（配信前・配信中・限定公開など）`}catch(x){m.textContent=x.message}});
 /* ---- ルーティング ---- */
 function route(){
   let h=location.hash.slice(1);try{h=decodeURIComponent(h)}catch(e){}
@@ -222,6 +249,8 @@ function route(){
   else if(p[1]==="s") detail(+p[2]);
   else if(p[1]==="f"&&filters[p[2]]) filterPage(p[2],p.slice(3).join("/"));
   else if(p[1]==="all") allPage();
+  else if(p[1]==="import") importPage();
+  else if(p[1]==="imp") importForm(+p[2]);
   else if(p[1]==="new") form(null);
   else if(p[1]==="edit") form(+p[2]);
   else if(p[1]==="q") home(p.slice(2).join("/"));
