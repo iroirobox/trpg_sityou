@@ -161,9 +161,12 @@ function detail(id){
   const s=logs.find(x=>x.id===id); if(!s) return home();
   const same=logs.filter(x=>x.id!==s.id&&norm(x.scenario)===norm(s.scenario)), sid=new Set(same.map(x=>x.id));
   const mem=x=>new Set([...x.gms,...x.cast.map(c=>c.pl)].map(norm)), me=mem(s);
-  const near=logs.filter(x=>x.id!==s.id&&!sid.has(x.id)).map(x=>({x,n:[...mem(x)].filter(m=>me.has(m)).length})).filter(o=>o.n>=2).sort((a,b)=>b.n-a.n||b.x.date.localeCompare(a.x.date)).slice(0,10);
+  const cand=logs.filter(x=>x.id!==s.id&&!sid.has(x.id)).map(x=>({x,n:[...mem(x)].filter(m=>me.has(m)).length})).sort((a,b)=>b.n-a.n||b.x.date.localeCompare(a.x.date));
+  const near=cand.filter(o=>o.n>=3); // 3人以上は全件、10件に届かなければ2人で補う
+  if(near.length<10) near.push(...cand.filter(o=>o.n===2).slice(0,10-near.length));
   const rels=[];
   if(same.length) rels.push(`<details><summary>同じシナリオ<span>${same.length}件</span></summary>${same.map(row).join("")}</details>`);
+  s.cast.filter(c=>c.pc).forEach(c=>{const l=byField("pc",c.pc).filter(x=>x.id!==s.id); if(l.length) rels.push(`<details><summary>${esc(c.pc)}が登場<span>${l.length}件</span></summary>${l.map(row).join("")}</details>`);});
   if(near.length) rels.push(`<details><summary>同卓者が近い記録<span>${near.length}件</span></summary>${near.map(o=>rowN(o.x,"共通"+o.n+"人")).join("")}</details>`);
   const pn=n=>`<a class="lk" href="#/f/person/${enc(n)}">${esc(n)}</a>`;
   const big=ytId(s.urls[0]&&s.urls[0].url);
