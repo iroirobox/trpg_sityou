@@ -41,7 +41,17 @@ h2{font-size:12px;font-weight:400;color:var(--sub);margin:64px 0 8px;letter-spac
 .dr:hover .dn{color:var(--accent)}
 .dr .dn{min-width:0;overflow-wrap:anywhere}
 .dr .dv{font-size:12px;color:var(--sub);white-space:nowrap;padding-top:3px}
-.dr i{display:block;flex-basis:100%;height:2px;background:var(--accent);margin-top:6px}
+.stats{display:flex;flex-wrap:wrap;gap:12px 40px;margin-bottom:8px}
+.sl{display:block;font-size:12px;color:var(--sub);letter-spacing:.06em}
+.big{display:block;font-family:var(--serif);font-size:40px;line-height:1.2;font-weight:600}
+.big small{font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:13px;font-weight:400;color:var(--sub);margin:0 6px 0 2px}
+.mc{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;margin-top:20px}
+.mc button{display:flex;flex-direction:column;justify-content:flex-end;height:130px;font-size:11px;color:var(--sub);text-align:center}
+.mc button:disabled{cursor:default}
+.mc i{display:block;width:100%;background:#dcdcdc;margin-bottom:6px}
+.mc .on i{background:var(--accent)}
+.mc .on{color:var(--accent)}
+.cap{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line);margin-top:4px;padding-top:12px}
 .act{display:inline-block;margin:20px 20px 0 0;font-size:13px;letter-spacing:.08em;color:var(--accent)}
 .empty,.note{color:var(--sub);padding:24px 0}
 .note{font-size:11px;padding:0;margin-top:72px}
@@ -193,28 +203,31 @@ function dataPage(){
   if(!ds.length){ app.innerHTML=head+'<a class="back" href="javascript:history.back()">戻る</a><p class="empty">まだ記録がありません</p>'; return; }
   const years=[...new Set(ds.map(x=>x.date.slice(0,4)))].sort().reverse(), yr=years.includes(st.year)?st.year:years[0];
   const grp=["all","gm","pl"].includes(st.group)?st.group:"all";
-  const bar=(name,href,l,max)=>{const t=sumT(l);return `<a class="dr" href="${href}"><span class="dn">${esc(name)}</span><span class="dv">${l.length}卓${t?"　"+fmtDur(t):""}</span><i style="width:${Math.max(2,l.length/max*100)}%"></i></a>`};
-  const rank=(keyFn,hrefFn,top)=>{ // 名前ごとに卓を集めて、卓数の多い順に並べる（同じ卓は1回だけ数える）
-    const m=new Map(); logs.forEach(x=>{[...new Set(keyFn(x).filter(Boolean).map(norm))].forEach(k=>{
-      const name=keyFn(x).find(n=>norm(n)===k); if(!m.has(k)) m.set(k,{name,l:[]}); m.get(k).l.push(x);});});
-    const a=[...m.values()].sort((p,q)=>q.l.length-p.l.length||sumT(q.l)-sumT(p.l)).slice(0,top), max=a.length?a[0].l.length:1;
-    return a.map(o=>bar(o.name,hrefFn(o.name),o.l,max)).join("")||'<p class="empty">なし</p>';
+  const months=new Map(); ds.filter(x=>x.date.startsWith(yr)).forEach(x=>{const k=x.date.slice(5,7); if(!months.has(k)) months.set(k,[]); months.get(k).push(x);});
+  const mk=[...months.keys()].sort(), cur=months.has(st.month)&&st.month.slice(0,0)===""?st.month:mk[mk.length-1];
+  const mmax=Math.max(...[...months.values()].map(l=>l.length)), cl=months.get(cur), ct=sumT(cl);
+  const chart=Array.from({length:12},(_,n)=>{const k=String(n+1).padStart(2,"0"),l=months.get(k);
+    return l?`<button class="${k===cur?"on":""}" data-m="${k}" aria-label="${n+1}月"><i style="height:${Math.max(4,l.length/mmax*100)}%"></i><span>${n+1}</span></button>`
+            :`<button disabled><i style="height:0"></i><span>${n+1}</span></button>`;}).join("");
+  const rank=(keyFn,hrefFn,top)=>{ // 名前ごとに卓を集めて、卓数の多い順（同じ卓は1回だけ数える）
+    const m=new Map(); logs.forEach(x=>{const names=keyFn(x); [...new Set(names.filter(Boolean).map(norm))].forEach(k=>{
+      if(!m.has(k)) m.set(k,{name:names.find(n=>norm(n)===k),l:[]}); m.get(k).l.push(x);});});
+    return [...m.values()].sort((p,q)=>q.l.length-p.l.length||sumT(q.l)-sumT(p.l)).slice(0,top).map(o=>{const t=sumT(o.l);
+      return `<a class="dr" href="${hrefFn(o.name)}"><span class="dn">${esc(o.name)}</span><span class="dv">${o.l.length}卓${t?"　"+fmtDur(t):""}</span></a>`}).join("")||'<p class="empty">なし</p>';
   };
-  const months=new Map(); ds.filter(x=>x.date.startsWith(yr)).forEach(x=>{const k=x.date.slice(0,7); if(!months.has(k)) months.set(k,[]); months.get(k).push(x);});
-  const mk=[...months.keys()].sort().reverse(), mmax=Math.max(...[...months.values()].map(l=>l.length));
-  const dates=ds.map(x=>x.date).sort(), none=logs.filter(x=>!x.dur).length;
-  const keyFn={all:x=>[...x.gms,...x.cast.map(c=>c.pl)],gm:x=>x.gms,pl:x=>x.cast.map(c=>c.pl)}[grp];
-  const base={all:"person",gm:"gm",pl:"pl"}[grp];
-  const tog=(a,cur,key)=>a.map(([v,t])=>`<button class="${v===cur?"on":""}" data-${key}="${v}">${t}</button>`).join(" / ");
+  const keyFn={all:x=>[...x.gms,...x.cast.map(c=>c.pl)],gm:x=>x.gms,pl:x=>x.cast.map(c=>c.pl)}[grp], base={all:"person",gm:"gm",pl:"pl"}[grp];
+  const tog=(a,c,key)=>a.map(([v,t])=>`<button class="${v===c?"on":""}" data-${key}="${v}">${t}</button>`).join(" / ");
+  const dates=ds.map(x=>x.date).sort(), none=logs.filter(x=>!x.dur).length, all=sumT(logs);
+  const big=t=>{const h=Math.floor(t/3600),m=Math.floor(t%3600/60);return h?`${h}<small>時間</small>${m}<small>分</small>`:`${m}<small>分</small>`};
   app.innerHTML=head+`<a class="back" href="javascript:history.back()">戻る</a>
-  <dl><div class="f"><dt>総卓数</dt><dd>${logs.length}卓</dd></div><div class="f"><dt>総時間</dt><dd>${sumT(logs)?fmtDur(sumT(logs)):"—"}</dd></div>
-  <div class="f"><dt>期間</dt><dd>${esc(dates[0])} 〜 ${esc(dates[dates.length-1])}</dd></div></dl>
-  <h2>月ごと</h2><p class="kicker">${tog(years.map(y=>[y,y]),yr,"y")}</p>${mk.map(k=>bar(+k.slice(5)+"月","#/f/month/"+k,months.get(k),mmax)).join("")}
-  <h2>よく見ている人</h2><p class="kicker">${tog([["all","全体"],["gm","GM"],["pl","PL"]],grp,"g")}</p>${rank(keyFn,n=>`#/f/${base}/${enc(n)}`,15)}
-  <h2>システム</h2>${rank(x=>[x.system],n=>"#/f/system/"+enc(n),10)}
+  <div class="stats"><div><span class="sl">総卓数</span><span class="big">${logs.length}<small>卓</small></span></div>${all?`<div><span class="sl">総時間</span><span class="big">${big(all)}</span></div>`:""}</div>
+  <p class="kicker">${esc(dates[0])} 〜 ${esc(dates[dates.length-1])}</p>
+  <h2>月ごと</h2><p class="kicker">${tog(years.map(y=>[y,y]),yr,"y")}</p><div class="mc">${chart}</div>
+  <div class="cap"><span>${+cur}月</span><span class="dv">${cl.length}卓${ct?"　"+fmtDur(ct):""}　<a class="lk" href="#/f/month/${yr}-${cur}">一覧</a></span></div>
+  <h2>よく見ている人</h2><p class="kicker">${tog([["all","全体"],["gm","GM"],["pl","PL"]],grp,"g")}</p>${rank(keyFn,n=>`#/f/${base}/${enc(n)}`,5)}
   ${none?`<p class="note">時間が未計算：${none}件</p>`:""}`;
-  app.querySelectorAll("[data-y],[data-g]").forEach(b=>b.onclick=()=>{
-    history.replaceState({...history.state,...(b.dataset.y?{year:b.dataset.y}:{group:b.dataset.g})},"");
+  app.querySelectorAll("[data-y],[data-g],[data-m]").forEach(b=>b.onclick=()=>{
+    const d=b.dataset; history.replaceState({...history.state,...(d.y?{year:d.y,month:null}:d.g?{group:d.g}:{month:d.m})},"");
     const y=scrollY; dataPage(); scrollTo(0,y);
   });
 }
