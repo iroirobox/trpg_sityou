@@ -37,6 +37,11 @@ h2{font-size:12px;font-weight:400;color:var(--sub);margin:64px 0 8px;letter-spac
 .row .t{display:block;font-family:var(--serif);font-size:17px;font-weight:600;line-height:1.55}
 .row .m{display:block;font-size:12px;color:var(--sub)}
 .row:hover .t{color:var(--accent)}
+.dr{display:flex;flex-wrap:wrap;justify-content:space-between;gap:0 12px;padding:14px 0 12px;border-bottom:1px solid var(--line)}
+.dr:hover .dn{color:var(--accent)}
+.dr .dn{min-width:0;overflow-wrap:anywhere}
+.dr .dv{font-size:12px;color:var(--sub);white-space:nowrap;padding-top:3px}
+.dr i{display:block;flex-basis:100%;height:2px;background:var(--accent);margin-top:6px}
 .act{display:inline-block;margin:20px 20px 0 0;font-size:13px;letter-spacing:.08em;color:var(--accent)}
 .empty,.note{color:var(--sub);padding:24px 0}
 .note{font-size:11px;padding:0;margin-top:72px}
@@ -112,8 +117,9 @@ function search(q,list=logs){
 }
 const filters={scenario:s=>v=>norm(s.scenario)===norm(v),system:s=>v=>norm(s.system)===norm(v),gm:s=>v=>s.gms.some(g=>norm(g)===norm(v)),
   pl:s=>v=>s.cast.some(c=>norm(c.pl)===norm(v)),pc:s=>v=>s.cast.some(c=>norm(c.pc)===norm(v)),
-  person:s=>v=>s.gms.some(g=>norm(g)===norm(v))||s.cast.some(c=>norm(c.pl)===norm(v))};
-const labels={scenario:"シナリオ",system:"システム",gm:"GM",pl:"PL",pc:"PC",person:""};
+  person:s=>v=>s.gms.some(g=>norm(g)===norm(v))||s.cast.some(c=>norm(c.pl)===norm(v)),
+  month:s=>v=>String(s.date).slice(0,7)===v};
+const labels={scenario:"シナリオ",system:"システム",gm:"GM",pl:"PL",pc:"PC",person:"",month:"視聴月"};
 const byField=(k,v)=>logs.filter(s=>filters[k](s)(v));
 
 /* ---- 部品 ---- */
@@ -127,11 +133,10 @@ const NONE='<p class="empty">見つかりませんでした</p>';
 
 /* ---- 画面 ---- */
 function home(q=""){
-  const tot=logs.reduce((a,x)=>a+durSec(x.dur),0);
   const l=q?search(q):logs.slice(0,8);
   app.innerHTML=head+`<input type="search" id="q" placeholder="シナリオ、システム、GM、PL、PC" value="${esc(q)}" autocomplete="off" enterkeyhint="search">
   <a class="act" href="#/new">＋ 追加</a>${LS.rec_arch?'<a class="act" href="#/import">アーカイブから追加</a>':""}<h2>${q?cnt(l):"最近"}</h2><div id="list">${l.map(row).join("")||(logs.length?NONE:'<p class="empty">まだ記録がありません</p>')}</div>
-  ${!q&&logs.length>8?'<a class="act" href="#/all">すべて見る</a>':""}<p class="note">${tot?"合計 "+fmtDur(tot)+"　":""}<a href="#/set">設定</a></p>`;
+  ${!q&&logs.length>8?'<a class="act" href="#/all">すべて見る</a>':""}<p class="note"><a href="#/set">設定</a>　<a href="#/data">データ</a></p>`;
   const i=document.getElementById("q");
   i.oninput=()=>{const v=i.value,l=v?search(v):logs.slice(0,8);document.querySelector("h2").textContent=v?cnt(l):"最近";
     document.getElementById("list").innerHTML=l.map(row).join("")||NONE;history.replaceState(history.state,"",v?"#/q/"+enc(v):"#/")};
@@ -180,6 +185,38 @@ function detail(id){
   ${s.tags.length?`<div class="f"><dt>タグ</dt><dd>${s.tags.map(t=>`<a class="x" href="https://x.com/search?q=${enc("#"+t)}" target="_blank" rel="noopener">#${esc(t)}</a>`).join("")}</dd></div>`:""}
   ${s.memo?`<div class="f"><dt>メモ</dt><dd class="memo">${memoHtml(s.memo)}</dd></div>`:""}</dl>
   <a class="act" href="#/edit/${s.id}">編集</a>${rels.length?`<h2>関連</h2>${rels.join("")}`:""}`;
+}
+/* ---- データ ---- */
+const sumT=l=>l.reduce((a,x)=>a+durSec(x.dur),0);
+function dataPage(){
+  const st=history.state||{}, ds=logs.filter(x=>/^\d{4}-\d\d/.test(x.date));
+  if(!ds.length){ app.innerHTML=head+'<a class="back" href="javascript:history.back()">戻る</a><p class="empty">まだ記録がありません</p>'; return; }
+  const years=[...new Set(ds.map(x=>x.date.slice(0,4)))].sort().reverse(), yr=years.includes(st.year)?st.year:years[0];
+  const grp=["all","gm","pl"].includes(st.group)?st.group:"all";
+  const bar=(name,href,l,max)=>{const t=sumT(l);return `<a class="dr" href="${href}"><span class="dn">${esc(name)}</span><span class="dv">${l.length}卓${t?"　"+fmtDur(t):""}</span><i style="width:${Math.max(2,l.length/max*100)}%"></i></a>`};
+  const rank=(keyFn,hrefFn,top)=>{ // 名前ごとに卓を集めて、卓数の多い順に並べる（同じ卓は1回だけ数える）
+    const m=new Map(); logs.forEach(x=>{[...new Set(keyFn(x).filter(Boolean).map(norm))].forEach(k=>{
+      const name=keyFn(x).find(n=>norm(n)===k); if(!m.has(k)) m.set(k,{name,l:[]}); m.get(k).l.push(x);});});
+    const a=[...m.values()].sort((p,q)=>q.l.length-p.l.length||sumT(q.l)-sumT(p.l)).slice(0,top), max=a.length?a[0].l.length:1;
+    return a.map(o=>bar(o.name,hrefFn(o.name),o.l,max)).join("")||'<p class="empty">なし</p>';
+  };
+  const months=new Map(); ds.filter(x=>x.date.startsWith(yr)).forEach(x=>{const k=x.date.slice(0,7); if(!months.has(k)) months.set(k,[]); months.get(k).push(x);});
+  const mk=[...months.keys()].sort().reverse(), mmax=Math.max(...[...months.values()].map(l=>l.length));
+  const dates=ds.map(x=>x.date).sort(), none=logs.filter(x=>!x.dur).length;
+  const keyFn={all:x=>[...x.gms,...x.cast.map(c=>c.pl)],gm:x=>x.gms,pl:x=>x.cast.map(c=>c.pl)}[grp];
+  const base={all:"person",gm:"gm",pl:"pl"}[grp];
+  const tog=(a,cur,key)=>a.map(([v,t])=>`<button class="${v===cur?"on":""}" data-${key}="${v}">${t}</button>`).join(" / ");
+  app.innerHTML=head+`<a class="back" href="javascript:history.back()">戻る</a>
+  <dl><div class="f"><dt>総卓数</dt><dd>${logs.length}卓</dd></div><div class="f"><dt>総時間</dt><dd>${sumT(logs)?fmtDur(sumT(logs)):"—"}</dd></div>
+  <div class="f"><dt>期間</dt><dd>${esc(dates[0])} 〜 ${esc(dates[dates.length-1])}</dd></div></dl>
+  <h2>月ごと</h2><p class="kicker">${tog(years.map(y=>[y,y]),yr,"y")}</p>${mk.map(k=>bar(+k.slice(5)+"月","#/f/month/"+k,months.get(k),mmax)).join("")}
+  <h2>よく見ている人</h2><p class="kicker">${tog([["all","全体"],["gm","GM"],["pl","PL"]],grp,"g")}</p>${rank(keyFn,n=>`#/f/${base}/${enc(n)}`,15)}
+  <h2>システム</h2>${rank(x=>[x.system],n=>"#/f/system/"+enc(n),10)}
+  ${none?`<p class="note">時間が未計算：${none}件</p>`:""}`;
+  app.querySelectorAll("[data-y],[data-g]").forEach(b=>b.onclick=()=>{
+    history.replaceState({...history.state,...(b.dataset.y?{year:b.dataset.y}:{group:b.dataset.g})},"");
+    const y=scrollY; dataPage(); scrollTo(0,y);
+  });
 }
 /* ---- 追加・編集 ---- */
 const pairRow=(a,b,pa,pb)=>`<div class="pair"><input value="${esc(a)}" placeholder="${pa}"><input value="${esc(b)}" placeholder="${pb}"><button class="rm" type="button">×</button></div>`;
@@ -252,6 +289,7 @@ function route(){
   else if(p[1]==="s") detail(+p[2]);
   else if(p[1]==="f"&&filters[p[2]]) filterPage(p[2],p.slice(3).join("/"));
   else if(p[1]==="all") allPage();
+  else if(p[1]==="data") dataPage();
   else if(p[1]==="import") importPage();
   else if(p[1]==="imp") importForm(+p[2]);
   else if(p[1]==="new") form(null);
