@@ -12,6 +12,7 @@ body{margin:0;color:var(--ink);background:#fff;font:15px/1.8 -apple-system,"Hira
 main{max-width:640px;margin:0 auto;padding:44px 28px 96px;animation:in .5s ease both}
 @keyframes in{from{opacity:0}to{opacity:1}}
 a{color:inherit;text-decoration:none}
+button,a{touch-action:manipulation} /* ダブルタップ拡大を防ぐ */
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .site{margin:0 0 72px;font-size:11px;color:var(--sub);letter-spacing:.12em;line-height:1.4}
@@ -45,10 +46,11 @@ h2{font-size:12px;font-weight:400;color:var(--sub);margin:64px 0 8px;letter-spac
 .sl{display:block;font-size:12px;color:var(--sub);letter-spacing:.06em}
 .big{display:block;font-family:var(--serif);font-size:40px;line-height:1.2;font-weight:600}
 .big small{font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:13px;font-weight:400;color:var(--sub);margin:0 6px 0 2px}
-.mc{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;margin-top:20px}
-.mc button{display:flex;flex-direction:column;justify-content:flex-end;height:130px;font-size:11px;color:var(--sub);text-align:center}
+.mc{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;margin-top:6px}
+.mc button{display:flex;flex-direction:column;font-size:11px;color:var(--sub);text-align:center}
+.mc .bw{display:flex;align-items:flex-end;height:110px;margin-bottom:6px}
 .mc button:disabled{cursor:default}
-.mc i{display:block;width:100%;background:#dcdcdc;margin-bottom:6px}
+.mc i{display:block;width:100%;background:#dcdcdc}
 .mc .on i{background:var(--accent)}
 .mc .on{color:var(--accent)}
 .cap{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line);margin-top:4px;padding-top:12px}
@@ -205,10 +207,13 @@ function dataPage(){
   const grp=["all","gm","pl"].includes(st.group)?st.group:"all";
   const months=new Map(); ds.filter(x=>x.date.startsWith(yr)).forEach(x=>{const k=x.date.slice(5,7); if(!months.has(k)) months.set(k,[]); months.get(k).push(x);});
   const mk=[...months.keys()].sort(), cur=months.has(st.month)&&st.month.slice(0,0)===""?st.month:mk[mk.length-1];
-  const mmax=Math.max(...[...months.values()].map(sumT)), cl=months.get(cur), ct=sumT(cl);
+  const cl=months.get(cur), ct=sumT(cl);
+  // 棒の高さ＝月の合計時間。一番上は、全期間で一番長い月を切り上げたきりのいい時間（年をまたいで比べられる）
+  const mt=new Map(); ds.forEach(x=>{const k=x.date.slice(0,7); mt.set(k,(mt.get(k)||0)+durSec(x.dur))});
+  const maxH=Math.max(0,...mt.values())/3600, top=[10,20,50,100,200,500,1000].find(v=>v>=maxH)||Math.ceil(maxH/1000)*1000, topSec=top*3600;
   const chart=Array.from({length:12},(_,n)=>{const k=String(n+1).padStart(2,"0"),l=months.get(k);
-    return l?`<button class="${k===cur?"on":""}" data-m="${k}" aria-label="${n+1}月"><i style="height:${mmax?Math.max(4,sumT(l)/mmax*100):4}%"></i><span>${n+1}</span></button>`
-            :`<button disabled><i style="height:0"></i><span>${n+1}</span></button>`;}).join("");
+    return l?`<button class="${k===cur?"on":""}" data-m="${k}" aria-label="${n+1}月"><b class="bw"><i style="height:${Math.max(4,Math.min(100,sumT(l)/topSec*100))}%"></i></b><span>${n+1}</span></button>`
+            :`<button disabled><b class="bw"><i style="height:0"></i></b><span>${n+1}</span></button>`;}).join("");
   const rank=(keyFn,hrefFn,top)=>{ // 名前ごとに卓を集めて、卓数の多い順（同じ卓は1回だけ数える）
     const m=new Map(); logs.forEach(x=>{const names=keyFn(x); [...new Set(names.filter(Boolean).map(norm))].forEach(k=>{
       if(!m.has(k)) m.set(k,{name:names.find(n=>norm(n)===k),l:[]}); m.get(k).l.push(x);});});
@@ -221,7 +226,7 @@ function dataPage(){
   const big=t=>{const h=Math.floor(t/3600),m=Math.floor(t%3600/60);return h?`${h}<small>時間</small>${m}<small>分</small>`:`${m}<small>分</small>`};
   app.innerHTML=head+`<a class="back" href="javascript:history.back()">戻る</a>
   <div class="stats"><div><span class="sl">総卓数</span><span class="big">${logs.length}<small>卓</small></span></div>${all?`<div><span class="sl">総時間</span><span class="big">${big(all)}</span></div>`:""}</div>
-  <h2>月ごと</h2><p class="kicker">${tog(years.map(y=>[y,y]),yr,"y")}</p><div class="mc">${chart}</div>
+  <p class="kicker" style="margin-top:64px">${tog(years.map(y=>[y,y]),yr,"y")}</p>${maxH?`<p class="sl" style="margin:20px 0 0">${top}時間</p>`:""}<div class="mc">${chart}</div>
   <div class="cap"><span>${+cur}月</span><span class="dv">${cl.length}卓${ct?"　"+fmtDur(ct):""}　<a class="lk" href="#/f/month/${yr}-${cur}">一覧</a></span></div>
   <h2>よく見ている人</h2><p class="kicker">${tog([["all","全体"],["gm","GM"],["pl","PL"]],grp,"g")}</p>${rank(keyFn,n=>`#/f/${base}/${enc(n)}`,5)}
   ${none?`<p class="note">時間が未計算：${none}件</p>`:""}`;
