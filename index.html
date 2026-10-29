@@ -205,9 +205,9 @@ function dataPage(){
   const grp=["all","gm","pl"].includes(st.group)?st.group:"all";
   const months=new Map(); ds.filter(x=>x.date.startsWith(yr)).forEach(x=>{const k=x.date.slice(5,7); if(!months.has(k)) months.set(k,[]); months.get(k).push(x);});
   const mk=[...months.keys()].sort(), cur=months.has(st.month)&&st.month.slice(0,0)===""?st.month:mk[mk.length-1];
-  const mmax=Math.max(...[...months.values()].map(l=>l.length)), cl=months.get(cur), ct=sumT(cl);
+  const mmax=Math.max(...[...months.values()].map(sumT)), cl=months.get(cur), ct=sumT(cl);
   const chart=Array.from({length:12},(_,n)=>{const k=String(n+1).padStart(2,"0"),l=months.get(k);
-    return l?`<button class="${k===cur?"on":""}" data-m="${k}" aria-label="${n+1}月"><i style="height:${Math.max(4,l.length/mmax*100)}%"></i><span>${n+1}</span></button>`
+    return l?`<button class="${k===cur?"on":""}" data-m="${k}" aria-label="${n+1}月"><i style="height:${mmax?Math.max(4,sumT(l)/mmax*100):4}%"></i><span>${n+1}</span></button>`
             :`<button disabled><i style="height:0"></i><span>${n+1}</span></button>`;}).join("");
   const rank=(keyFn,hrefFn,top)=>{ // 名前ごとに卓を集めて、卓数の多い順（同じ卓は1回だけ数える）
     const m=new Map(); logs.forEach(x=>{const names=keyFn(x); [...new Set(names.filter(Boolean).map(norm))].forEach(k=>{
@@ -217,11 +217,10 @@ function dataPage(){
   };
   const keyFn={all:x=>[...x.gms,...x.cast.map(c=>c.pl)],gm:x=>x.gms,pl:x=>x.cast.map(c=>c.pl)}[grp], base={all:"person",gm:"gm",pl:"pl"}[grp];
   const tog=(a,c,key)=>a.map(([v,t])=>`<button class="${v===c?"on":""}" data-${key}="${v}">${t}</button>`).join(" / ");
-  const dates=ds.map(x=>x.date).sort(), none=logs.filter(x=>!x.dur).length, all=sumT(logs);
+  const none=logs.filter(x=>!x.dur).length, all=sumT(logs);
   const big=t=>{const h=Math.floor(t/3600),m=Math.floor(t%3600/60);return h?`${h}<small>時間</small>${m}<small>分</small>`:`${m}<small>分</small>`};
   app.innerHTML=head+`<a class="back" href="javascript:history.back()">戻る</a>
   <div class="stats"><div><span class="sl">総卓数</span><span class="big">${logs.length}<small>卓</small></span></div>${all?`<div><span class="sl">総時間</span><span class="big">${big(all)}</span></div>`:""}</div>
-  <p class="kicker">${esc(dates[0])} 〜 ${esc(dates[dates.length-1])}</p>
   <h2>月ごと</h2><p class="kicker">${tog(years.map(y=>[y,y]),yr,"y")}</p><div class="mc">${chart}</div>
   <div class="cap"><span>${+cur}月</span><span class="dv">${cl.length}卓${ct?"　"+fmtDur(ct):""}　<a class="lk" href="#/f/month/${yr}-${cur}">一覧</a></span></div>
   <h2>よく見ている人</h2><p class="kicker">${tog([["all","全体"],["gm","GM"],["pl","PL"]],grp,"g")}</p>${rank(keyFn,n=>`#/f/${base}/${enc(n)}`,5)}
@@ -293,7 +292,7 @@ function settings(msg=""){
     try{await refresh();go("#/")}catch(e){document.getElementById("msg").textContent=e.message}};
 }
 document.addEventListener("click",async e=>{ if(e.target.id!=="rc") return; const m=document.getElementById("msg"); m.textContent="計算中…";
-  try{const r=await api("recalc"); await refresh(); m.textContent=`${r.updated}件を更新。${r.pending}件は未確定です（配信前・配信中・限定公開など）`}catch(x){m.textContent=x.message}});
+  try{const r=await api("recalc"); await refresh(); m.textContent=`${r.updated}件を更新。${r.pending}件は、一部の長さがまだ取れていません（配信前・配信中・限定公開など）`}catch(x){m.textContent=x.message}});
 /* ---- ルーティング ---- */
 function route(){
   let h=location.hash.slice(1);try{h=decodeURIComponent(h)}catch(e){}
