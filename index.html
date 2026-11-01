@@ -291,13 +291,42 @@ function settings(msg=""){
   app.innerHTML=head+`<p class="kicker">設定</p><label>Apps Script のURL</label><input id="u" value="${esc(LS.rec_url||"")}" placeholder="https://script.google.com/macros/s/…/exec">
   <label>パスワード</label><input type="password" id="p" value="${esc(LS.rec_pw||"")}">
   <label>アーカイブのURL（任意。複数は改行で区切る）</label><textarea id="a" placeholder="https://script.google.com/macros/s/…/exec">${esc(LS.rec_arch||"")}</textarea>
-  <div class="btns"><button class="btn" id="ok">保存して開く</button>${LS.rec_url?'<button class="btn g" id="rc">配信時間を計算し直す</button>':""}</div><p class="msg" id="msg">${esc(msg)}</p>
+  <div class="btns"><button class="btn" id="ok">保存して開く</button>${LS.rec_url?'<button class="btn g" id="rc">配信時間を計算し直す</button>':""}${LS.rec_url&&LS.rec_arch?'<button class="btn g" id="syb">アーカイブの内容を反映する</button>':""}</div><p class="msg" id="msg">${esc(msg)}</p><div id="sy"></div>
   <p class="note">URLとパスワードは、この端末のブラウザの中にだけ保存されます。</p>`;
   document.getElementById("ok").onclick=async()=>{LS.rec_url=u.value.trim();LS.rec_pw=p.value;LS.rec_arch=a.value.trim();arch=null;document.getElementById("msg").textContent="確認中…";
     try{await refresh();go("#/")}catch(e){document.getElementById("msg").textContent=e.message}};
 }
 document.addEventListener("click",async e=>{ if(e.target.id!=="rc") return; const m=document.getElementById("msg"); m.textContent="計算中…";
   try{const r=await api("recalc"); await refresh(); m.textContent=`${r.updated}件を更新。${r.pending}件は、一部の長さがまだ取れていません（配信前・配信中・限定公開など）`}catch(x){m.textContent=x.message}});
+/* ---- アーカイブの内容を反映する（視聴日とメモは変えない。確認してから反映） ---- */
+const SYNC=["シナリオ","システム","GM","PL/PC","配信URL","タグ"];
+const cmpOf={"シナリオ":x=>norm(x),"システム":x=>norm(x),"GM":x=>JSON.stringify(String(x||"").split(/[,，、]/).map(norm).filter(Boolean)),
+  "PL/PC":x=>JSON.stringify(parseCast(x).map(c=>[norm(c.pl),norm(c.pc)])),"配信URL":x=>JSON.stringify(parseUrls(x).map(u=>[norm(u.label),vid(u.url)])),
+  "タグ":x=>JSON.stringify(String(x||"").split(/[\s,、，]+/).map(t=>norm(t.replace(/^[#＃]/,""))).filter(Boolean).sort())};
+let syncList=[];
+document.addEventListener("click",async e=>{
+  const m=document.getElementById("msg"), box=document.getElementById("sy");
+  if(e.target.id==="syb"){
+    m.textContent="確認中…"; box.innerHTML="";
+    try{ if(!arch) await loadArch(); }catch(x){ m.textContent="アーカイブを読み込めませんでした。URLを確認してください"; return; }
+    const byV=new Map(); arch.forEach(a=>a.urls.forEach(u=>{ if(!byV.has(vid(u.url))) byV.set(vid(u.url),a); }));
+    syncList=[]; logs.forEach(l=>{ const a=l.urls.map(u=>byV.get(vid(u.url))).find(Boolean); if(!a) return;
+      const diff=SYNC.filter(k=>cmpOf[k](l.raw[k])!==cmpOf[k](a.raw[k])); if(diff.length) syncList.push({l,a,diff}); });
+    m.textContent=syncList.length?`${syncList.length}件が変わります。内容を確認して、反映してください`:"反映する内容はありません";
+    box.innerHTML=syncList.map(c=>`<div style="padding:14px 0;border-top:1px solid var(--line)"><b>${esc(c.l.scenario)}</b> <small style="color:var(--sub)">${esc(c.l.date)}</small>${c.diff.map(k=>`<div style="font-size:13px;color:var(--sub);overflow-wrap:anywhere">${esc(k)}：${esc(c.l.raw[k]||"（空）")} → <span style="color:var(--accent)">${esc(c.a.raw[k]||"（空）")}</span></div>`).join("")}</div>`).join("")
+      +(syncList.length?'<div class="btns"><button class="btn" id="sya">反映する</button></div>':"");
+  }
+  if(e.target.id==="sya"){
+    e.target.disabled=true; let n=0;
+    try{
+      for(const c of syncList){ m.textContent=`反映中… ${n+1}/${syncList.length}`;
+        const d={...c.l.raw}; delete d._row; c.diff.forEach(k=>d[k]=c.a.raw[k]); // 視聴日・メモはそのまま
+        const res=await api("save",{row:c.l.id,data:d});
+        rowsData=rowsData.map(r=>r._row===c.l.id?{...r,...d,"配信時間":res.duration||r["配信時間"]||""}:r); n++; }
+      build(rowsData); m.textContent=`${n}件を反映しました`; document.getElementById("sy").innerHTML="";
+    }catch(x){ build(rowsData); m.textContent=`${n}件を反映したところで止まりました：${x.message}`; e.target.disabled=false; }
+  }
+});
 /* ---- ルーティング ---- */
 function route(){
   let h=location.hash.slice(1);try{h=decodeURIComponent(h)}catch(e){}
