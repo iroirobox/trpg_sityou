@@ -226,7 +226,7 @@ function dataPage(){
   const big=t=>{const h=Math.floor(t/3600),m=Math.floor(t%3600/60);return h?`${h}<small>時間</small>${m}<small>分</small>`:`${m}<small>分</small>`};
   app.innerHTML=head+`<a class="back" href="javascript:history.back()">戻る</a>
   <div class="stats"><div><span class="sl">総卓数</span><span class="big">${logs.length}<small>卓</small></span></div>${all?`<div><span class="sl">総時間</span><span class="big">${big(all)}</span></div>`:""}</div>
-  <p class="kicker" style="margin-top:64px">${tog(years.map(y=>[y,y]),yr,"y")}</p>${maxH?`<p class="sl" style="margin:20px 0 0">${top}時間</p>`:""}<div class="mc">${chart}</div>
+  <p class="kicker" style="margin-top:64px">${tog(years.map(y=>[y,y]),yr,"y")}</p><div class="mc">${chart}</div>
   <div class="cap"><span>${+cur}月</span><span class="dv">${cl.length}卓${ct?"　"+fmtDur(ct):""}　<a class="lk" href="#/f/month/${yr}-${cur}">一覧</a></span></div>
   <h2>よく見ている人</h2><p class="kicker">${tog([["all","全体"],["gm","GM"],["pl","PL"]],grp,"g")}</p>${rank(keyFn,n=>`#/f/${base}/${enc(n)}`,5)}
   ${none?`<p class="note">時間が未計算：${none}件</p>`:""}`;
